@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PharmaSignal — Adverse Event Signal Detection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EDEFEC;
+    --paper-raised: #F7F8F6;
+    --ink: #1B2A2E;
+    --ink-soft: #4B5A5C;
+    --sage: #8B9A93;
+    --sage-line: #D3D9D4;
+    --signal-red: #B8452F;
+    --signal-red-bg: #F4E3DE;
+    --signal-amber: #C98A2C;
+    --signal-amber-bg: #F4EBDA;
+    --safety-teal: #4A7A6F;
+    --safety-teal-bg: #E3ECE9;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ===== HEADER ===== */
+  .masthead {
+    grid-column: 1 / -1;
+    padding: 20px 28px;
+    border-bottom: 2px solid var(--ink);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    background: var(--paper-raised);
+  }
+  .masthead h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .masthead h1 .dot { color: var(--signal-red); }
+  .masthead .subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .masthead .meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-align: right;
+  }
+
+  /* ===== SIDEBAR / WORKLIST ===== */
+  .worklist {
+    border-right: 2px solid var(--ink);
+    overflow-y: auto;
+    max-height: calc(100vh - 65px);
+    background: var(--paper-raised);
+  }
+  .worklist-header {
+    padding: 14px 20px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--sage-line);
+    display: flex;
+    justify-content: space-between;
+  }
+  .signal-row {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--sage-line);
+    cursor: pointer;
+    transition: background 0.12s ease;
+    position: relative;
+  }
+  .signal-row:hover { background: var(--safety-teal-bg); }
+  .signal-row.active {
+    background: var(--paper);
+    border-left: 4px solid var(--signal-red);
+    padding-left: 16px;
+  }
+  .signal-row .row-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
+  }
+  .signal-row .drug-reaction {
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .signal-row .drug-reaction .arrow { color: var(--sage); margin: 0 4px; font-weight: 400; }
+  .priority-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .priority-badge.high { background: var(--signal-red-bg); color: var(--signal-red); }
+  .priority-badge.moderate { background: var(--signal-amber-bg); color: var(--signal-amber); }
+  .row-stats {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink-soft);
+  }
+
+  /* ===== MAIN PANEL ===== */
+  .detail {
+    padding: 28px 40px;
+    overflow-y: auto;
+    max-height: calc(100vh - 65px);
+  }
+  .detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+  }
+  .detail-header h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  .detail-header h2 .arrow { color: var(--sage); margin: 0 8px; }
+  .detail-header .stamp {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 6px 14px;
+    border: 1.5px solid currentColor;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    transform: rotate(-2deg);
+  }
+  .stamp.high { color: var(--signal-red); }
+  .stamp.moderate { color: var(--signal-amber); }
+
+  .stat-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--paper-raised);
+    border: 1px solid var(--sage-line);
+    border-radius: 4px;
+    padding: 14px 16px;
+  }
+  .stat-card .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+  .stat-card .value {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+  }
+  .stat-card .footnote {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--sage);
+    margin-top: 4px;
+  }
+
+  .section-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--signal-red);
+    display: inline-block;
+    border-radius: 1px;
+  }
+
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    margin-bottom: 28px;
+  }
+
+  /* contingency table */
+  .contingency-wrap {
+    background: var(--paper-raised);
+    border: 1px solid var(--sage-line);
+    border-radius: 4px;
+    padding: 18px 20px;
+  }
+  table.contingency {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+  }
+  table.contingency th, table.contingency td {
+    border: 1px solid var(--sage-line);
+    padding: 10px 8px;
+    text-align: center;
+  }
+  table.contingency th {
+    background: var(--paper);
+    font-weight: 500;
+    color: var(--ink-soft);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  table.contingency td.cell-a {
+    background: var(--signal-red-bg);
+    color: var(--signal-red);
+    font-weight: 700;
+    font-size: 15px;
+  }
+  table.contingency .corner { background: var(--ink); color: var(--paper); }
+  .formula-note {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    margin-top: 12px;
+    line-height: 1.6;
+  }
+
+  /* narrative */
+  .narrative-wrap {
+    background: var(--paper-raised);
+    border: 1px solid var(--sage-line);
+    border-left: 4px solid var(--ink);
+    border-radius: 4px;
+    padding: 18px 20px;
+  }
+  .narrative-text {
+    font-size: 13.5px;
+    line-height: 1.7;
+    color: var(--ink);
+  }
+  .narrative-footer {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--sage-line);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--sage);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .outcomes-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  .outcome-chip {
+    background: var(--paper-raised);
+    border: 1px solid var(--sage-line);
+    border-radius: 4px;
+    padding: 12px 14px;
+    text-align: center;
+  }
+  .outcome-chip .n {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+  }
+  .outcome-chip .l {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9.5px;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 2px;
+  }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--sage-line); border-radius: 4px; }
+</style>
+<style>
+  .search-bar {
+    padding: 14px 20px;
+    border-bottom: 2px solid var(--ink);
+    background: var(--paper-raised);
+    display: flex;
+    gap: 8px;
+  }
+  .search-bar input {
+    flex: 1;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--sage-line);
+    border-radius: 3px;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .search-bar input::placeholder { color: var(--sage); }
+  .search-bar button {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 8px 14px;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .search-bar button:hover { background: var(--signal-red); border-color: var(--signal-red); }
+  .search-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .source-toggle {
+    padding: 8px 20px 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--sage-line);
+    background: var(--paper-raised);
+  }
+  .source-toggle b { color: var(--ink); }
+  .state-msg {
+    padding: 40px 20px;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .state-msg.error { color: var(--signal-red); }
+</style>
+<body>
+<div class="app">
+  <div class="masthead">
+    <div>
+      <h1>PharmaSignal<span class="dot">.</span></h1>
+      <div class="subtitle">Disproportionality-based adverse event signal detection</div>
+    </div>
+    <div class="meta" id="masthead-meta">connecting to API…</div>
+  </div>
+
+  <div class="worklist">
+    <div class="search-bar">
+      <input type="text" id="drug-search" placeholder="Live-analyze a drug (e.g. ibuprofen)…" />
+      <button id="analyze-btn">Analyze</button>
+    </div>
+    <div class="source-toggle" id="source-toggle">Source: <b>precomputed background dataset</b></div>
+    <div class="worklist-header">
+      <span>Signal worklist</span>
+      <span id="worklist-count"></span>
+    </div>
+    <div id="worklist-body"><div class="state-msg">Loading signals…</div></div>
+  </div>
+
+  <div class="detail" id="detail-panel"><div class="state-msg">Select a signal from the worklist.</div></div>
+</div>
+
+<script>
+  // Point this at your deployed Render backend URL.
+  // Locally: http://localhost:8000
+  // After deploying: https://your-service-name.onrender.com
+  const API_BASE = window.PHARMASIGNAL_API_BASE || "http://localhost:8000";
+
+  let SIGNALS = [];
+  let totalReports = 15000;
+
+  function cap(s) {
+    return s.split(' ').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+  }
+
+  function priorityClass(score) {
+    return score >= 4 ? 'high' : 'moderate';
+  }
+
+  async function loadPrecomputedSignals() {
+    document.getElementById('worklist-body').innerHTML = '<div class="state-msg">Loading signals from API…</div>';
+    try {
+      const res = await fetch(`${API_BASE}/api/signals`);
+      if (!res.ok) throw new Error(`API returned ${res.status}`);
+      const data = await res.json();
+      SIGNALS = data.signals.sort((a, b) => b.priority_score - a.priority_score);
+      document.getElementById('source-toggle').innerHTML = 'Source: <b>precomputed background dataset</b>';
+      document.getElementById('masthead-meta').innerHTML =
+        `${totalReports.toLocaleString()} reports analyzed · ${SIGNALS.length} signals flagged<br>method: PRR / ROR disproportionality (Evans et al. threshold)`;
+      document.getElementById('worklist-count').textContent = `${SIGNALS.length} flagged`;
+      renderWorklist(0);
+      renderDetail(0);
+    } catch (err) {
+      document.getElementById('worklist-body').innerHTML =
+        `<div class="state-msg error">Couldn't reach the API at ${API_BASE}.<br><br>Is the backend running / deployed?<br>${err.message}</div>`;
+      document.getElementById('masthead-meta').textContent = 'API unreachable';
+    }
+  }
+
+  async function analyzeLiveDrug(drug) {
+    const btn = document.getElementById('analyze-btn');
+    btn.disabled = true;
+    btn.textContent = 'Analyzing…';
+    document.getElementById('worklist-body').innerHTML = `<div class="state-msg">Fetching live FAERS data for "${drug}"…<br>(this calls the real FDA API and can take a few seconds)</div>`;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/analyze/${encodeURIComponent(drug)}`);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.detail || `API returned ${res.status}`);
+      }
+      const data = await res.json();
+      SIGNALS = data.signals.sort((a, b) => b.priority_score - a.priority_score);
+      document.getElementById('source-toggle').innerHTML =
+        `Source: <b>live FAERS data for ${cap(drug)}</b> (${data.reports_fetched} reports fetched)`;
+      document.getElementById('masthead-meta').innerHTML =
+        `Live analysis: ${cap(drug)}<br>${data.reports_fetched} reports fetched · ${SIGNALS.filter(s=>s.signal_detected).length} signals flagged`;
+      document.getElementById('worklist-count').textContent = `${SIGNALS.filter(s=>s.signal_detected).length} flagged`;
+
+      if (SIGNALS.filter(s => s.signal_detected).length === 0) {
+        document.getElementById('worklist-body').innerHTML = '<div class="state-msg">No statistically significant signals found for this drug in the sample pulled.</div>';
+        document.getElementById('detail-panel').innerHTML = '<div class="state-msg">No signal selected.</div>';
+      } else {
+        renderWorklist(0, true);
+        renderDetail(0, true);
+      }
+    } catch (err) {
+      document.getElementById('worklist-body').innerHTML = `<div class="state-msg error">${err.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Analyze';
+    }
+  }
+
+  function renderWorklist(selectedIdx, liveOnly) {
+    const list = liveOnly ? SIGNALS.filter(s => s.signal_detected) : SIGNALS.filter(s => s.signal_detected);
+    const body = document.getElementById('worklist-body');
+    body.innerHTML = list.map((s, i) => `
+      <div class="signal-row ${i === selectedIdx ? 'active' : ''}" data-idx="${i}">
+        <div class="row-top">
+          <div class="drug-reaction">${cap(s.drug)}<span class="arrow">→</span>${cap(s.reaction)}</div>
+          <div class="priority-badge ${priorityClass(s.priority_score)}">${s.priority_score.toFixed(1)}</div>
+        </div>
+        <div class="row-stats">PRR ${s.PRR} · n=${s.case_count} · ${s.deaths} deaths</div>
+      </div>
+    `).join('');
+
+    body.querySelectorAll('.signal-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const idx = parseInt(row.dataset.idx);
+        renderWorklist(idx, liveOnly);
+        renderDetail(idx, liveOnly);
+      });
+    });
+  }
+
+  function renderDetail(idx, liveOnly) {
+    const list = SIGNALS.filter(s => s.signal_detected);
+    const s = list[idx];
+    if (!s) return;
+    const pClass = priorityClass(s.priority_score);
+    const panel = document.getElementById('detail-panel');
+
+    panel.innerHTML = `
+      <div class="detail-header">
+        <div>
+          <h2>${cap(s.drug)}<span class="arrow">→</span>${cap(s.reaction)}</h2>
+        </div>
+        <div class="stamp ${pClass}">${pClass === 'high' ? 'High priority' : 'Moderate priority'}</div>
+      </div>
+
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="label">PRR</div>
+          <div class="value">${s.PRR}</div>
+          <div class="footnote">threshold ≥ 2.0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">ROR</div>
+          <div class="value">${s.ROR}</div>
+          <div class="footnote">reporting odds ratio</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Chi-squared</div>
+          <div class="value">${s.chi_squared}</div>
+          <div class="footnote">threshold ≥ 4.0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Case count</div>
+          <div class="value">${s.case_count}</div>
+          <div class="footnote">of ${totalReports.toLocaleString()} reports</div>
+        </div>
+      </div>
+
+      <div class="content-grid">
+        <div class="contingency-wrap">
+          <div class="section-title">2×2 contingency table</div>
+          <table class="contingency">
+            <tr>
+              <th class="corner"></th>
+              <th>${cap(s.reaction)}</th>
+              <th>All other reactions</th>
+            </tr>
+            <tr>
+              <th>${cap(s.drug)}</th>
+              <td class="cell-a">${s.a}</td>
+              <td>${s.b}</td>
+            </tr>
+            <tr>
+              <th>All other drugs</th>
+              <td>${s.c}</td>
+              <td>${s.d}</td>
+            </tr>
+          </table>
+          <div class="formula-note">
+            PRR = [a/(a+b)] / [c/(c+d)] = [${s.a}/${s.a+s.b}] / [${s.c}/${s.c+s.d}] = <b>${s.PRR}</b><br>
+            ROR = (a·d) / (b·c) = (${s.a}×${s.d}) / (${s.b}×${s.c}) = <b>${s.ROR}</b>
+          </div>
+        </div>
+
+        <div class="narrative-wrap">
+          <div class="section-title">Auto-drafted signal summary</div>
+          <div class="narrative-text">${s.narrative}</div>
+          <div class="narrative-footer">Rule-based draft · pending reviewer sign-off</div>
+        </div>
+      </div>
+
+      <div class="section-title">Clinical outcome breakdown</div>
+      <div class="outcomes-row">
+        <div class="outcome-chip"><div class="n">${s.deaths}</div><div class="l">Deaths</div></div>
+        <div class="outcome-chip"><div class="n">${s.hospitalizations}</div><div class="l">Hospitalizations</div></div>
+        <div class="outcome-chip"><div class="n">${s.life_threatening}</div><div class="l">Life-threatening</div></div>
+        <div class="outcome-chip"><div class="n">${s.disabling}</div><div class="l">Disabling</div></div>
+      </div>
+    `;
+  }
+
+  document.getElementById('analyze-btn').addEventListener('click', () => {
+    const drug = document.getElementById('drug-search').value.trim();
+    if (drug) analyzeLiveDrug(drug);
+  });
+  document.getElementById('drug-search').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('analyze-btn').click();
+  });
+
+  loadPrecomputedSignals();
+</script>
+</body>
+</html>
