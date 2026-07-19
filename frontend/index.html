@@ -392,7 +392,7 @@
 
 <script>
   // Point this at your deployed Render backend URL.
-  // Locally: https://pharmasignal-sius.onrender.com
+  // Locally: http://localhost:8000
   // After deploying: https://your-service-name.onrender.com
   const API_BASE = window.PHARMASIGNAL_API_BASE || "https://pharmasignal-sius.onrender.com";
 
@@ -407,10 +407,19 @@
     return score >= 4 ? 'high' : 'moderate';
   }
 
-  async function loadPrecomputedSignals() {
-    document.getElementById('worklist-body').innerHTML = '<div class="state-msg">Loading signals from API…</div>';
+  async function loadPrecomputedSignals(attempt = 1) {
+    const maxAttempts = 6;
+    const waitMsg = attempt === 1
+      ? 'Loading signals from API…'
+      : `Backend is waking up (free-tier cold start)… retry ${attempt - 1}/${maxAttempts - 1}`;
+    document.getElementById('worklist-body').innerHTML = `<div class="state-msg">${waitMsg}</div>`;
+
     try {
-      const res = await fetch(`${API_BASE}/api/signals`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      const res = await fetch(`${API_BASE}/api/signals`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
       if (!res.ok) throw new Error(`API returned ${res.status}`);
       const data = await res.json();
       SIGNALS = data.signals.sort((a, b) => b.priority_score - a.priority_score);
@@ -421,9 +430,13 @@
       renderWorklist(0);
       renderDetail(0);
     } catch (err) {
-      document.getElementById('worklist-body').innerHTML =
-        `<div class="state-msg error">Couldn't reach the API at ${API_BASE}.<br><br>Is the backend running / deployed?<br>${err.message}</div>`;
-      document.getElementById('masthead-meta').textContent = 'API unreachable';
+      if (attempt < maxAttempts) {
+        setTimeout(() => loadPrecomputedSignals(attempt + 1), 4000);
+      } else {
+        document.getElementById('worklist-body').innerHTML =
+          `<div class="state-msg error">Couldn't reach the API at ${API_BASE} after several tries.<br><br>Is the backend deployed and running on Render?<br>${err.message}<br><br><button onclick="loadPrecomputedSignals()" style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:6px 12px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:3px;cursor:pointer;">Retry now</button></div>`;
+        document.getElementById('masthead-meta').textContent = 'API unreachable';
+      }
     }
   }
 
