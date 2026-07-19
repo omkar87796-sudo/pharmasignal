@@ -37,7 +37,7 @@ app = FastAPI(title="PharmaSignal API", version="1.0.0")
 # Allow the Vercel frontend (and localhost during dev) to call this API.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten this to your exact Vercel URL after deploying
+    allow_origins=["https://your-actual-vercel-url.vercel.app"],  # tighten this to your exact Vercel URL after deploying
     allow_methods=["GET"],
     allow_headers=["*"],
 )
